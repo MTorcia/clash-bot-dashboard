@@ -40,30 +40,40 @@ def sync_history_logic():
 
     conn.commit()
     conn.close()
-    return f"✅ Storico ripristinato: {imported_weeks} settimane caricate."
+    return f"✅ Storico ripristinato: {imported_weeks} settimane (passate) caricate."
 
 # --- COMANDI TELEGRAM ---
 async def import_history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⏳ Scarico dati...")
+    await update.message.reply_text("⏳ Svuoto e ricarico lo storico...")
+    # Eseguiamo un reset pulito per evitare duplicati
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM war_history WHERE date LIKE 'W%' AND date NOT LIKE 'Week-%'")
+    conn.commit()
+    conn.close()
+    
     # Chiama la logica pura
     result = sync_history_logic()
     await update.message.reply_text(result)
 
 async def storia_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    clan_data = make_api_request("")
+    clan_data = make_api_request("") # Chiede la lista membri attuale
     if not clan_data:
-        await update.message.reply_text("❌ Errore membri attuali.")
+        await update.message.reply_text("❌ Errore API: impossibile recuperare i membri attuali.")
         return
-    current_tags = [m['tag'] for m in clan_data.get('memberList', [])]
+    
+    # Crea un set di tag dei membri attuali per un lookup veloce O(1)
+    current_members_tags = {m['tag'] for m in clan_data.get('memberList', [])}
     
     conn = get_connection()
     c = conn.cursor()
+    # QUERY CORRETTA: Somma solo le settimane storiche (W...) ESCLUDENDO la corrente (Week...)
     query = """
         SELECT p.tag, p.name, p.status, 
                SUM(w.decks_used), SUM(w.decks_possible), SUM(w.fame), COUNT(w.id)
         FROM players p
         JOIN war_history w ON p.tag = w.player_tag
-        WHERE w.date LIKE 'W%'
+        WHERE w.date LIKE 'W%' AND w.date NOT LIKE 'Week-%'
         GROUP BY p.tag
         ORDER BY SUM(w.decks_used) DESC
     """
@@ -81,17 +91,30 @@ async def storia_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for row in rows:
         tag, name, status, used, possible, fame, weeks = row
-        if tag not in current_tags: continue
+        
+        # FILTRO FONDAMENTALE: Salta chi non è attualmente nel clan
+        if tag not in current_members_tags: continue
 
         icon = {0: "⚪️", 1: "🟢", 2: "🔴", 3: "⚫️"}.get(status, "⚪️")
-        fame_str = f"{fame/1000:.1f}k" if fame >= 1000 else str(fame)
-        new_mark = "*" if weeks < 10 else " "
-        safe_name = html.escape(name[:9])
         
-        line = f"{icon}| <code>{safe_name:<9}{new_mark}|{used:>3}/{possible:<3}|{fame_str:>6}</code>\n"
+        # Calcolo % Partecipazione (opzionale ma utile)
+        percent = (used / possible * 100) if possible > 0 else 0
+        
+        fame_str = f"{fame/1000:.1f}k" if fame >= 1000 else str(fame)
+        new_mark = "🆕" if weeks < 2 else "" # Se ha meno di 2 settimane registrate è nuovo
+        
+        safe_name = html.escape(name[:8])
+        
+        # Formattazione allineata: Icona | Nome | Mazzi | Fama
+        line = f"{icon}| <code>{safe_name:<8} {new_mark}|{used:>3}/{possible:<3}|{fame_str:>5}</code>\n"
         
         if len(msg) + len(line) > 3900:
-            await update.message.reply_text(msg, parse_mode='HTML'); msg = "📊 <b>STORICO (Cont.)</b>\n"
+            await update.message.reply_text(msg, parse_mode='HTML')
+            msg = "📊 <b>STORICO (Cont.)</b>\n"
+            msg += "<code>St| Nome     | Tot    | Fama </code>\n"
+            
         msg += line
+
+    await update.message.reply_text(msg, parse_mode='HTML')
 
     await update.message.reply_text(msg, parse_mode='HTML')

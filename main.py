@@ -84,12 +84,29 @@ async def get_dashboard_data():
     c = conn.cursor()
     
     # 1. Recupera Anagrafica Base
+    # RECUPERIAMO SOLO I GIOCATORI CHE SONO ATTUALMENTE NEL CLAN?
+    # No, il DB potrebbe avere ex membri. 
+    # Dobbiamo fare una verifica live o assumere che nel DB ci siano tutti ma filtrare chi non ha stats recenti?
+    # L'utente ha chiesto "SOLO i player attivi adesso nel clan".
+    # Quindi dobbiamo scaricare la lista membri dal API e filtrare.
+    
+    from database import make_api_request
+    clan_data = make_api_request("")
+    active_tags = set()
+    if clan_data and 'memberList' in clan_data:
+        for m in clan_data['memberList']:
+            active_tags.add(m['tag'])
+            
     c.execute("SELECT tag, name, status, admin_notes FROM players")
     # Creiamo un dizionario per accesso rapido
     players = {}
     for r in c.fetchall():
-        players[r[0]] = {
-            "tag": r[0],
+        tag = r[0]
+        # FILTRO ATTVI: Se non è nella lista API, lo ignoriamo dalla dashboard
+        if tag not in active_tags: continue
+        
+        players[tag] = {
+            "tag": tag,
             "name": r[1],
             "status": r[2],
             "note": r[3] or "", # Se None, diventa stringa vuota
@@ -100,26 +117,26 @@ async def get_dashboard_data():
             "hist_fame": 0
         }
     
-    # 2. Dati War Attuale (Date che iniziano con Week-)
+    # 2. Dati War Attuale (Week- e SOLO per i player attivi)
     c.execute("SELECT player_tag, SUM(decks_used), SUM(fame) FROM war_history WHERE date LIKE 'Week-%' GROUP BY player_tag")
     for r in c.fetchall():
         tag, decks, fame = r
-        if tag in players:
+        if tag in players: # players contiene già solo gli attivi grazie al filtro sopra
             players[tag]["cur_decks"] = decks or 0
             players[tag]["cur_fame"] = fame or 0
 
-    # 3. Dati Storico (Date che iniziano con W ma NON sono la war corrente Week-)
+    # 3. Dati Storico (W- e SOLO per i player attivi, NON Week-)
     c.execute("SELECT player_tag, SUM(decks_used), SUM(decks_possible), SUM(fame) FROM war_history WHERE date LIKE 'W%' AND date NOT LIKE 'Week-%' GROUP BY player_tag")
     for r in c.fetchall():
         tag, decks, possible, fame = r
-        if tag in players:
+        if tag in players: # players contiene già solo gli attivi
             players[tag]["hist_decks"] = decks or 0
             players[tag]["hist_possible"] = possible or 0
             players[tag]["hist_fame"] = fame or 0
 
     conn.close()
-    # Restituisce una lista pulita ordinata per status (i rossi prima)
-    return sorted(list(players.values()), key=lambda x: x['status'], reverse=True)
+    # Ordina: Prima lo status (dal più alto), poi il nome
+    return sorted(list(players.values()), key=lambda x: (x['status'], x['name']), reverse=True)
 
 @app.post("/api/update")
 async def update_player(data: PlayerUpdate):

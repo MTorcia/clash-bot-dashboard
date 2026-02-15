@@ -244,6 +244,10 @@ async def war_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for m in all_current_members:
         tag = m['tag']
+        
+        # Filtro: Se il giocatore non è più nel clan (caso strano, ma possibile per cache API) passiamo oltre
+        # Ma qui stiamo iterando SUGLI ATTUALI, quindi sono sicuramente dentro.
+        
         name = m['name']
         
         p = participants.get(tag)
