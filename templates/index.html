@@ -169,10 +169,14 @@
                             <option value="3" ${p.status==3?'selected':''}>🔴</option>
                         </select>
                         
-                        <input type="text" placeholder="Note..." value="${p.note}" 
-                               onblur="updateNote('${p.tag}', this)" />
+                        <input type="text" placeholder="Note..." onchange="updateNote('${p.tag}', this)" onblur="updateNote('${p.tag}', this)" />
+                        <span id="status-${p.tag}" style="font-size:12px; margin-left:5px; display:none;">💾</span>
                     </div>
                 `;
+                // Imposta il valore manualmente per evitare problemi con virgolette
+                const inputEl = card.querySelector('input');
+                inputEl.value = p.note || ''; 
+                
                 container.appendChild(card);
             });
         }
@@ -205,10 +209,21 @@
         async function updateNote(tag, inputEl) {
             const newNote = inputEl.value;
             const player = globalData.find(p => p.tag === tag);
+            const statusIcon = document.getElementById(`status-${tag}`);
+
             if(player) {
                 if(player.note === newNote) return; // Non inviare se non è cambiato nulla
+                
+                // Feedback Visivo
+                if(statusIcon) { statusIcon.style.display = 'inline'; statusIcon.innerText = '💾'; }
+                
                 player.note = newNote;
-                await sendUpdate(tag, player.status, newNote);
+                try {
+                    await sendUpdate(tag, player.status, newNote);
+                    if(statusIcon) { statusIcon.innerText = '✅'; setTimeout(() => { statusIcon.style.display = 'none'; }, 2000); }
+                } catch(e) {
+                    if(statusIcon) { statusIcon.innerText = '❌'; console.error(e); }
+                }
             }
         }
 

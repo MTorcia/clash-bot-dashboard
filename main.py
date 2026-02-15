@@ -161,9 +161,15 @@ async def get_dashboard_data():
 
 @app.post("/api/update")
 async def update_player(data: PlayerUpdate):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE players SET status = ?, admin_notes = ? WHERE tag = ?", (data.status, data.note, data.tag))
-    conn.commit()
-    conn.close()
-    return {"status": "ok"}
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        # Usa una stringa vuota se la nota è None, per sicurezza
+        safe_note = data.note if data.note is not None else ""
+        c.execute("UPDATE players SET status = ?, admin_notes = ? WHERE tag = ?", (data.status, safe_note, data.tag))
+        conn.commit()
+        conn.close()
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"❌ Errore aggiornamento: {e}")
+        return {"status": "error", "message": str(e)}
