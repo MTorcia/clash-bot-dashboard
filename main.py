@@ -13,17 +13,16 @@ from war_passate import storia_command, import_history_command, sync_history_log
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 async def dashboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Sostituisci l'URL qui sotto con l'URL dove ospiterai la tua pagina HTML
-    # Per ora usiamo un placeholder
-    webapp_url = "https://tuo-sito-web.vercel.app" 
+    # App Render
+    webapp_url = "https://clash-bot-dashboard.onrender.com" 
     
     keyboard = [
-        [InlineKeyboardButton("📊 Apri Dashboard Clan", web_app=WebAppInfo(url=webapp_url))]
+        [InlineKeyboardButton("📱 Apri Dashboard", web_app=WebAppInfo(url=webapp_url))]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "Clicca il pulsante qui sotto per gestire il clan in modo interattivo:",
+        "Clicca sotto per aprire la Dashboard:",
         reply_markup=reply_markup
     )
 
