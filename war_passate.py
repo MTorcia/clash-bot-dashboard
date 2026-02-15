@@ -4,6 +4,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from database import get_connection, make_api_request, CLAN_TAG
 
+import datetime
+
 # --- LOGICA PURA (Funziona senza utente) ---
 def sync_history_logic():
     """Scarica lo storico e popola il DB. Ritorna un messaggio di stato."""
@@ -15,10 +17,23 @@ def sync_history_logic():
     c = conn.cursor()
     imported_weeks = 0
     
+    # Calcolo Lunedì della settimana CORRENTE per escluderla dallo storico
+    today = datetime.date.today()
+    current_monday = today - datetime.timedelta(days=today.weekday())
+    current_week_date = current_monday.strftime('%Y%m%d')
+    
     for race in log_data['items']:
         season_id = race.get('sectionIndex', 'S')
-        raw_date = race.get('createdDate', '00000000')
-        week_label = f"W{season_id}-{raw_date[:8]}"
+        # L'API restituisce createdDate come "20231023T100000.000Z"
+        raw_date_full = race.get('createdDate', '00000000')
+        raw_date = raw_date_full[:8]
+        
+        # FIX: Se la data del log corrisponde alla settimana corrente, SALTA.
+        # Questo evita duplicati tra /war (Week-...) e /storia (W-...)
+        if raw_date == current_week_date:
+            continue
+
+        week_label = f"W{season_id}-{raw_date}"
         
         my_clan = None
         for standing in race.get('standings', []):
@@ -40,7 +55,7 @@ def sync_history_logic():
 
     conn.commit()
     conn.close()
-    return f"✅ Storico ripristinato: {imported_weeks} settimane (passate) caricate."
+    return f"✅ Storico ripristinato: {imported_weeks} settimane caricate (filtrando la corrente)."
 
 # --- COMANDI TELEGRAM ---
 async def import_history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -48,7 +63,12 @@ async def import_history_command(update: Update, context: ContextTypes.DEFAULT_T
     # Eseguiamo un reset pulito per evitare duplicati
     conn = get_connection()
     c = conn.cursor()
+    # Pulisci SOLO lo storico vero (W...)
     c.execute("DELETE FROM war_history WHERE date LIKE 'W%' AND date NOT LIKE 'Week-%'")
+    # Per sicurezza, cancelliamo anche eventuali vecchie chiavi 'Week-...' se non è la corrente? 
+    # No, lasciamo che /scan gestisca Week-.
+    # Ma cancelliamo la corrente se l'abbiamo importata per sbaglio come W...
+    
     conn.commit()
     conn.close()
     

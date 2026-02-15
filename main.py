@@ -118,7 +118,14 @@ async def get_dashboard_data():
         }
     
     # 2. Dati War Attuale (Week- e SOLO per i player attivi)
-    c.execute("SELECT player_tag, SUM(decks_used), SUM(fame) FROM war_history WHERE date LIKE 'Week-%' GROUP BY player_tag")
+    # Calcolo ID Settimana Corrente
+    import datetime
+    today = datetime.date.today()
+    current_monday = today - datetime.timedelta(days=today.weekday())
+    current_week_id = f"Week-{current_monday.strftime('%Y%m%d')}"
+    
+    # Seleziona SOLO la settimana corrente, ignorando eventuali vecchie "Week-..." rimaste appese
+    c.execute("SELECT player_tag, SUM(decks_used), SUM(fame) FROM war_history WHERE date = ? GROUP BY player_tag", (current_week_id,))
     for r in c.fetchall():
         tag, decks, fame = r
         if tag in players: # players contiene già solo gli attivi grazie al filtro sopra
