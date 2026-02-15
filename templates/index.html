@@ -1,47 +1,172 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clan Dashboard</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background-color: #f0f2f5; margin: 0; padding: 15px; }
-        .card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #f5f5f5);
+            --text-color: var(--tg-theme-text-color, #000);
+            --card-bg: var(--tg-theme-secondary-bg-color, #fff);
+            --accent: var(--tg-theme-button-color, #3390ec);
+        }
+        body { font-family: sans-serif; background: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; }
+        
+        /* TABS */
+        .tabs { display: flex; background: var(--card-bg); position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; border-bottom: 3px solid transparent; font-weight: bold; }
+        .tab.active { border-bottom-color: var(--accent); color: var(--accent); }
+        
+        /* CONTENUTO */
+        .content { padding: 10px; display: none; }
+        .content.active { display: block; }
+        
+        /* CARD GIOCATORE */
+        .card { background: var(--card-bg); border-radius: 10px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .name { font-weight: bold; font-size: 1.1em; }
-        .stats { color: #666; font-size: 0.9em; }
-        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-        .btn-action { background: #0088cc; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        
+        /* STATISTICHE */
+        .stats-row { display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 10px; color: #666; }
+        .stat-box { background: rgba(0,0,0,0.05); padding: 5px 10px; border-radius: 5px; }
+        
+        /* CONTROLLI (Status e Note) */
+        .controls { display: flex; gap: 10px; align-items: center; }
+        
+        select.status-select {
+            padding: 8px; border-radius: 5px; border: 1px solid #ddd; font-weight: bold; appearance: none;
+            width: 120px; text-align: center;
+        }
+        /* Colori Status */
+        .st-0 { background: #fff; color: #000; border-color: #ccc; } /* Bianco */
+        .st-1 { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; } /* Verde */
+        .st-2 { background: #fff3e0; color: #ef6c00; border-color: #ffcc80; } /* Arancione */
+        .st-3 { background: #ffebee; color: #c62828; border-color: #ef9a9a; } /* Rosso */
+
+        input.note-input {
+            flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; background: transparent; color: var(--text-color);
+        }
     </style>
 </head>
 <body>
-    <h2>📊 Gestione Clan</h2>
-    <div id="player-list">
-        <div class="card">
-            <div>
-                <span class="status-dot" style="background: #4caf50;"></span>
-                <span class="name">SuperMario</span><br>
-                <span class="stats">⚔️ 160/160 | 🏅 25.4k</span>
-            </div>
-            <button class="btn-action" onclick="editPlayer('#TAG123')">Gestisci</button>
-        </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('current')">🔥 War Attuale</div>
+        <div class="tab" onclick="switchTab('history')">📜 Storico (10)</div>
+    </div>
+
+    <div id="current" class="content active">
+        <div id="list-current"></div>
+    </div>
+
+    <div id="history" class="content">
+        <div id="list-history"></div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Espande l'app a tutto schermo
+        tg.expand();
 
-        function editPlayer(tag) {
-            tg.showPopup({
-                title: 'Gestione Membro',
-                message: 'Cosa vuoi fare con questo giocatore?',
-                buttons: [
-                    {id: 'status', type: 'default', text: 'Cambia Status'},
-                    {id: 'note', type: 'default', text: 'Modifica Nota'},
-                    {type: 'destructive', text: 'Annulla'}
-                ]
+        let allData = [];
+
+        async function loadData() {
+            try {
+                const res = await fetch('/api/data');
+                allData = await res.json();
+                render();
+            } catch (e) {
+                console.error("Errore caricamento: " + e);
+                // tg.showAlert("Errore caricamento: " + e);
+            }
+        }
+
+        function render() {
+            const listCur = document.getElementById('list-current');
+            const listHist = document.getElementById('list-history');
+            listCur.innerHTML = '';
+            listHist.innerHTML = '';
+
+            // Ordina: prima chi ha status rosso/arancio, poi per nome
+            allData.sort((a, b) => b.status - a.status);
+
+            allData.forEach(p => {
+                // Genera HTML per Tab Corrente
+                const decksCur = p.current ? (p.current.decks || 0) : 0;
+                const fameCur = p.current ? (p.current.fame || 0) : 0;
+                listCur.appendChild(createCard(p, decksCur + " attacchi", kFormatter(fameCur)));
+
+                // Genera HTML per Tab Storico
+                const decksHist = p.history ? (p.history.decks || 0) : 0;
+                const possHist = p.history ? (p.history.possible || 160) : 160; 
+                const fameHist = p.history ? (p.history.fame || 0) : 0;
+                listHist.appendChild(createCard(p, decksHist + "/" + possHist, kFormatter(fameHist)));
             });
         }
+
+        function createCard(player, statText, fameText) {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `
+                <div class="card-header">
+                    <span class="name">${player.name}</span>
+                    <div class="stats-row" style="margin:0; gap:10px;">
+                        <span class="stat-box">⚔️ ${statText}</span>
+                        <span class="stat-box">🏅 ${fameText}</span>
+                    </div>
+                </div>
+                <div class="controls">
+                    <select class="status-select st-${player.status}" onchange="updatePlayer('${player.tag}', this, 'status')">
+                        <option value="0" ${player.status==0?'selected':''}>⚪️ Neutro</option>
+                        <option value="1" ${player.status==1?'selected':''}>🟢 Ottimo</option>
+                        <option value="2" ${player.status==2?'selected':''}>🟠 Attenzione</option>
+                        <option value="3" ${player.status==3?'selected':''}>🔴 Pericolo</option>
+                    </select>
+                    <input type="text" class="note-input" placeholder="Note..." 
+                           value="${player.note || ''}" 
+                           onblur="updatePlayer('${player.tag}', this, 'note')">
+                </div>
+            `;
+            return div;
+        }
+
+        async function updatePlayer(tag, element, type) {
+            // Trova il giocatore nei dati locali
+            const p = allData.find(x => x.tag === tag);
+            if (type === 'status') {
+                p.status = parseInt(element.value);
+                // Aggiorna colore select
+                element.className = `status-select st-${p.status}`;
+            } else {
+                p.note = element.value;
+            }
+
+            // Manda al server
+            await fetch('/api/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ tag: tag, status: p.status, note: p.note })
+            });
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            
+            // Trova l'elemento cliccato (o il parent se clicchi sul testo)
+            const activeTab = Array.from(document.querySelectorAll('.tab')).find(t => t.innerText.includes(tabId === 'current' ? 'Attuale' : 'Storico'));
+            if(activeTab) activeTab.classList.add('active');
+            
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function kFormatter(num) {
+            return Math.abs(num) > 999 ? Math.sign(num)*((Math.abs(num)/1000).toFixed(1)) + 'k' : Math.sign(num)*Math.abs(num)
+        }
+
+        // Avvio
+        loadData();
     </script>
 </body>
 </html>
