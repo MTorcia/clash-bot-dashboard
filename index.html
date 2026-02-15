@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clan Dashboard</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #f0f2f5; margin: 0; padding: 15px; }
+        .card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .name { font-weight: bold; font-size: 1.1em; }
+        .stats { color: #666; font-size: 0.9em; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .btn-action { background: #0088cc; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>📊 Gestione Clan</h2>
+    <div id="player-list">
+        <div class="card">
+            <div>
+                <span class="status-dot" style="background: #4caf50;"></span>
+                <span class="name">SuperMario</span><br>
+                <span class="stats">⚔️ 160/160 | 🏅 25.4k</span>
+            </div>
+            <button class="btn-action" onclick="editPlayer('#TAG123')">Gestisci</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Espande l'app a tutto schermo
+
+        function editPlayer(tag) {
+            tg.showPopup({
+                title: 'Gestione Membro',
+                message: 'Cosa vuoi fare con questo giocatore?',
+                buttons: [
+                    {id: 'status', type: 'default', text: 'Cambia Status'},
+                    {id: 'note', type: 'default', text: 'Modifica Nota'},
+                    {type: 'destructive', text: 'Annulla'}
+                ]
+            });
+        }
+    </script>
+</body>
+</html>
