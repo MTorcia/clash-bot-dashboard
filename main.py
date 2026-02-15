@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from database import init_db, get_connection, TG_TOKEN
 
@@ -55,6 +55,20 @@ async def lifespan(app: FastAPI):
 
     await bot_app.initialize()
     await bot_app.start()
+
+    # IMPOSTA I SUGGERIMENTI DEI COMANDI
+    commands = [
+        BotCommand("scan", "🔄 Aggiorna i dati della War corrente"),
+        BotCommand("waroggi", "⚔️ Report attacchi di oggi"),
+        BotCommand("war", "🏆 Andamento generale della settimana"),
+        BotCommand("storia", "📜 Storico ultime 10 settimane"),
+        BotCommand("dashboard", "📱 Apri il gestionale web"),
+        BotCommand("status", "🚦 Imposta status (0-3)"),
+        BotCommand("nota", "📝 Aggiungi nota giocatore"),
+        BotCommand("importa", "📥 Riscarica lo storico dall'API")
+    ]
+    await bot_app.bot.set_my_commands(commands)
+
     await bot_app.updater.start_polling()
     yield
     await bot_app.updater.stop()
