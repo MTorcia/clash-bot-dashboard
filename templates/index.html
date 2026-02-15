@@ -55,6 +55,16 @@
         <div id="tab-hist" class="tab" onclick="setTab('history')">📜 Storico</div>
     </div>
 
+    <!-- BARRA ORDINAMENTO -->
+    <div style="background:var(--card-bg); padding:10px; text-align:center; border-bottom:1px solid rgba(0,0,0,0.05);">
+        <label for="sortSelect" style="font-size:14px; color:#888;">Ordina per:</label>
+        <select id="sortSelect" onchange="changeSort(this.value)" style="width:auto; margin-left:5px; font-weight:normal;">
+            <option value="status">🚦 Status</option>
+            <option value="decks_asc">📉 Attacchi (Min → Max)</option>
+            <option value="decks_desc">📈 Attacchi (Max → Min)</option>
+        </select>
+    </div>
+
     <div class="container" id="list-container">
         <div style="text-align:center; padding:20px; color:#888;">Caricamento dati...</div>
     </div>
@@ -66,6 +76,7 @@
 
         let globalData = [];
         let currentMode = 'current'; // 'current' o 'history'
+        let currentSort = 'status'; // 'status', 'decks_asc', 'decks_desc'
 
         // Funzione Principale di Caricamento
         async function init() {
@@ -78,12 +89,46 @@
             }
         }
 
+        // Funzione Helper per ottenere i valori di ordinamento
+        function getSortValue(p) {
+            if (currentMode === 'current') return p.cur_decks;
+            return p.hist_decks; // Usa i mazzi totali dello storico
+        }
+
+        // Cambio Ordinamento
+        function changeSort(val) {
+            currentSort = val;
+            renderList();
+        }
+
         // Funzione per disegnare la lista a schermo
         function renderList() {
             const container = document.getElementById('list-container');
             container.innerHTML = '';
 
-            globalData.forEach(p => {
+            // Recupera la scelta dropdown
+            const selectEl = document.getElementById('sortSelect');
+            if (selectEl) currentSort = selectEl.value;
+
+            // Crea una copia e ordina
+            let list = [...globalData];
+            
+            list.sort((a, b) => {
+                if (currentSort === 'status') {
+                    // Ordina per Status (decrescente: nero -> rosso -> verde -> bianco)
+                    if (b.status !== a.status) return b.status - a.status;
+                    return a.name.localeCompare(b.name);
+                } else if (currentSort === 'decks_asc') {
+                    // Crescente (chi ha fatto MENO attacchi prima)
+                    return getSortValue(a) - getSortValue(b);
+                } else if (currentSort === 'decks_desc') {
+                    // Decrescente (chi ha fatto PIÙ attacchi prima)
+                    return getSortValue(b) - getSortValue(a);
+                }
+                return 0;
+            });
+
+            list.forEach(p => {
                 // Prepara i dati in base alla Tab selezionata
                 let decksTxt, fameTxt;
                 
