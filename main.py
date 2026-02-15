@@ -1,7 +1,9 @@
 import logging
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from database import init_db, TG_TOKEN
@@ -82,10 +84,12 @@ async def lifespan(app: FastAPI):
 
 # Creazione App FastAPI
 app = FastAPI(lifespan=lifespan)
+templates = Jinja2Templates(directory="templates")
 
-@app.get("/")
-async def root():
-    return {"message": "Clash Royale Bot API is running"}
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    """Serve la pagina HTML della dashboard"""
+    return templates.TemplateResponse("index.html", {"request": request})
 
 if __name__ == '__main__':
     import uvicorn
