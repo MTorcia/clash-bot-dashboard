@@ -298,13 +298,28 @@ async def set_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 2:
         await update.message.reply_text("Uso: /status #TAG [0-3]\n0=⚪️, 1=🟢, 2=🔴, 3=⚫️")
         return
-    tag, status = context.args[0].upper(), int(context.args[1])
+    tag_input = context.args[0].upper()
+    if not tag_input.startswith("#"):
+        tag_input = "#" + tag_input
+        
+    try:
+        new_status = int(context.args[1])
+    except ValueError:
+        await update.message.reply_text("❌ Lo status deve essere un numero (0-3).")
+        return
+
     try:
         conn = get_connection()
-        conn.execute("UPDATE players SET status = ? WHERE tag = ?", (status, tag))
+        c = conn.cursor()
+        c.execute("UPDATE players SET status = ? WHERE tag = ?", (new_status, tag_input))
+        rows = c.rowcount
         conn.commit()
         conn.close()
-        await update.message.reply_text(f"✅ Status aggiornato per {tag}")
+        
+        if rows > 0:
+            await update.message.reply_text(f"✅ Status aggiornato per {tag_input} a {new_status}")
+        else:
+            await update.message.reply_text(f"⚠️ Tag {tag_input} non trovato nel database.\nAssicurati che il giocatore sia stato scansionato.")
     except Exception as e:
         await update.message.reply_text(f"❌ Errore DB: {e}")
 
@@ -312,12 +327,23 @@ async def set_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 2:
         await update.message.reply_text("Uso: /nota #TAG testo")
         return
-    tag, note = context.args[0].upper(), " ".join(context.args[1:])
+    
+    tag_input = context.args[0].upper()
+    if not tag_input.startswith("#"):
+        tag_input = "#" + tag_input
+        
+    note = " ".join(context.args[1:])
     try:
         conn = get_connection()
-        conn.execute("UPDATE players SET admin_notes = ? WHERE tag = ?", (note, tag))
+        c = conn.cursor()
+        c.execute("UPDATE players SET admin_notes = ? WHERE tag = ?", (note, tag_input))
+        rows = c.rowcount
         conn.commit()
         conn.close()
-        await update.message.reply_text(f"✅ Nota salvata per {tag}")
+        
+        if rows > 0:
+            await update.message.reply_text(f"✅ Nota salvata per {tag_input}")
+        else:
+            await update.message.reply_text(f"⚠️ Tag {tag_input} non trovato nel database.")
     except Exception as e:
         await update.message.reply_text(f"❌ Errore DB: {e}")

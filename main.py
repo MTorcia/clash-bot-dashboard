@@ -164,9 +164,15 @@ async def update_player(data: PlayerUpdate):
     try:
         conn = get_connection()
         c = conn.cursor()
+        
+        # FIX: Assicura che il tag abbia il prefisso #
+        tag_clean = data.tag.upper()
+        if not tag_clean.startswith("#"):
+            tag_clean = "#" + tag_clean
+            
         # Usa una stringa vuota se la nota è None, per sicurezza
         safe_note = data.note if data.note is not None else ""
-        c.execute("UPDATE players SET status = ?, admin_notes = ? WHERE tag = ?", (data.status, safe_note, data.tag))
+        c.execute("UPDATE players SET status = ?, admin_notes = ? WHERE tag = ?", (data.status, safe_note, tag_clean))
         conn.commit()
         conn.close()
         return {"status": "ok"}
