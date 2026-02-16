@@ -89,7 +89,8 @@
         // Funzione Principale di Caricamento
         async function init() {
             try {
-                const response = await fetch('/api/data');
+                // Aggiunto timestamp per evitare cache
+                const response = await fetch('/api/data?t=' + new Date().getTime());
                 globalData = await response.json();
                 renderList();
             } catch (error) {
@@ -151,6 +152,9 @@
                 }
 
                 // Crea la Card HTML
+                // CLEAN TAG FOR ID (Rimuovi # per evitare problemi CSS/JS)
+                const safeTag = p.tag.replace('#', '');
+                
                 const card = document.createElement('div');
                 card.className = 'card';
                 card.innerHTML = `
@@ -170,7 +174,7 @@
                         </select>
                         
                         <input type="text" placeholder="Note..." onchange="updateNote('${p.tag}', this)" onblur="updateNote('${p.tag}', this)" />
-                        <span id="status-${p.tag}" style="font-size:12px; margin-left:5px; display:none;">💾</span>
+                        <span id="status-${safeTag}" style="font-size:12px; margin-left:5px; display:none;">💾</span>
                     </div>
                 `;
                 // Imposta il valore manualmente per evitare problemi con virgolette
@@ -209,7 +213,9 @@
         async function updateNote(tag, inputEl) {
             const newNote = inputEl.value;
             const player = globalData.find(p => p.tag === tag);
-            const statusIcon = document.getElementById(`status-${tag}`);
+            // CLEAN TAG FOR ID
+            const safeTag = tag.replace('#', '');
+            const statusIcon = document.getElementById(`status-${safeTag}`);
 
             if(player) {
                 if(player.note === newNote) return; // Non inviare se non è cambiato nulla
@@ -229,11 +235,15 @@
 
         // Funzione helper per inviare dati
         async function sendUpdate(tag, status, note) {
-            await fetch('/api/update', {
+            const response = await fetch('/api/update', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ tag, status, note })
             });
+            const result = await response.json();
+            if (result.status !== 'ok') {
+                throw new Error(result.message || 'Errore sconosciuto');
+            }
         }
 
         // Formatta numeri (es. 12500 -> 12.5k)
